@@ -1,0 +1,14 @@
+Como abrir a aplicacao
+
+1. Abra esta pasta:
+   C:\Users\gamartin\Documents\Codex\2026-05-18\preciso-criar-uma-aplica-o-em
+
+2. De dois cliques em:
+   abrir-aplicacao.cmd
+
+3. Quando a pagina abrir no navegador, clique em "Importar CSV".
+
+4. Escolha o arquivo:
+   C:\Users\gamartin\Downloads\realtime.csv
+
+Se o Windows mostrar um aviso de seguranca ao abrir o arquivo .cmd, escolha manter/permitir.

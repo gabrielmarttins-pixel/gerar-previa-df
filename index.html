@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gerar prévia</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="dashboard">
+        <header class="masthead">
+          <div class="brand-block">
+            <h1>AUDIÊNCIA PRÉVIA</h1>
+            <input
+              class="market-badge"
+              id="marketBadge"
+              type="text"
+              value="PROGRAMA"
+              aria-label="Nome do programa"
+            />
+          </div>
+          <button id="downloadImageButton" class="download-button" type="button">
+            Baixar imagem
+          </button>
+        </header>
+
+        <section class="snapshot">
+          <div class="time-card">
+            <span id="reportDate">--/--/----</span>
+            <strong id="reportRange">--:-- - --:--</strong>
+          </div>
+          <div id="metricStrip" class="metric-strip" aria-label="Indicadores de audiência"></div>
+        </section>
+
+        <section class="interval-toolbar" aria-label="Intervalo">
+          <div class="history-fields" aria-label="Média histórica">
+            <span>Média histórica</span>
+            <label>
+              Audiência
+              <input id="historicalAudience" class="signed-input" type="text" inputmode="decimal" placeholder="0,0" />
+            </label>
+            <label>
+              Variação
+              <input id="historicalShare" class="signed-input" type="text" inputmode="decimal" placeholder="0,0%" />
+            </label>
+          </div>
+          <div class="interval-fields">
+            <div class="interval-heading">
+              <span>Intervalos</span>
+              <button id="addIntervalButton" type="button">Adicionar</button>
+            </div>
+            <div id="intervalList" class="interval-list"></div>
+          </div>
+        </section>
+
+        <section class="chart-area">
+          <canvas id="audienceChart"></canvas>
+          <div id="emptyState" class="empty-state">
+            <strong>Importe o CSV de realtime</strong>
+            <span>As linhas de audiência aparecem aqui com as cores das emissoras.</span>
+            <label class="empty-upload-button">
+              <input id="emptyCsvInput" type="file" accept=".csv,text/csv" />
+              <span>Selecionar arquivo CSV</span>
+            </label>
+          </div>
+        </section>
+
+        <footer class="footer-row">
+          <span id="status" role="status"></span>
+          <span>Fonte: Ibope. DF. Dados prévios. 1 pt de audiência domiciliar no DF equivale a 10.034 domicílios.</span>
+        </footer>
+      </section>
+    </main>
+
+    <script src="./logo-data.js"></script>
+    <script src="./script.js"></script>
+  </body>
+</html>
