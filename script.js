@@ -11,6 +11,7 @@ const addIntervalButton = document.querySelector("#addIntervalButton");
 const downloadImageButton = document.querySelector("#downloadImageButton");
 const historicalAudience = document.querySelector("#historicalAudience");
 const historicalShare = document.querySelector("#historicalShare");
+const presenterName = document.querySelector("#presenterName");
 
 let rows = [];
 let headers = [];
@@ -774,10 +775,9 @@ async function downloadCleanImage() {
 
   context.fillStyle = "#ffffff";
   context.fillRect(0, 0, width, height);
-  drawExportHeader(context, width);
+  await drawExportHeader(context, width);
   await drawTvGloboLogo(context, width);
   await drawExportMetrics(context, series);
-  drawExportHistorical(context);
   drawMultiLineChartOnContext(context, series, getActiveHeader(), {
     x: 24,
     y: 240,
@@ -792,23 +792,54 @@ async function downloadCleanImage() {
   link.click();
 }
 
-function drawExportHeader(context, width) {
+async function drawExportHeader(context, width) {
+  const headerY = 26;
+  const headerHeight = 42;
+  const headerCenterY = headerY + headerHeight / 2;
+
   context.fillStyle = "#0b36a8";
   context.font = "900 34px Globotipo, Arial, sans-serif";
+  context.textBaseline = "middle";
   context.textAlign = "left";
   context.fillText("AUDIÊNCIA PRÉVIA", 28, 48);
 
   const badgeText = marketBadge.value || "DF1";
-  context.font = "900 21px Globotipo, Arial, sans-serif";
-  const badgeWidth = Math.max(72, context.measureText(badgeText).width + 36);
-  const badgeX = width / 2 - badgeWidth / 2;
-  roundRect(context, badgeX, 17, badgeWidth, 42, 21);
-  context.fill();
-  context.fillStyle = "#ffffff";
-  context.textAlign = "center";
-  context.fillText(badgeText, width / 2, 45);
+  const programLogo = getProgramLogoSource(badgeText);
+  let badgeX = 330;
+  let badgeWidth = 0;
+
+  if (programLogo) {
+    const logoSize = getProgramLogoSize(badgeText);
+    badgeWidth = logoSize.width;
+    await drawLogoImageContain(
+      context,
+      programLogo,
+      badgeX,
+      headerY,
+      logoSize.width,
+      logoSize.height,
+    );
+  } else {
+    context.font = "900 21px Globotipo, Arial, sans-serif";
+    badgeWidth = Math.max(72, context.measureText(badgeText).width + 36);
+    roundRect(context, badgeX, headerY, badgeWidth, headerHeight, 21);
+    context.fill();
+    context.fillStyle = "#ffffff";
+    context.textAlign = "center";
+    context.fillText(badgeText, badgeX + badgeWidth / 2, headerCenterY);
+  }
+
+  const presenter = presenterName.value.trim();
+  if (presenter) {
+    context.fillStyle = "#0b36a8";
+    context.font = "400 15px Globotipo, Arial, sans-serif";
+    context.textAlign = "left";
+    context.fillText(`Apresentação: ${presenter}`, badgeX + badgeWidth + 16, 44);
+    context.textAlign = "center";
+  }
 
   context.fillStyle = "#0b36a8";
+  context.textBaseline = "alphabetic";
   context.font = "900 15px Globotipo, Arial, sans-serif";
   context.font = "900 21px Globotipo, Arial, sans-serif";
   context.textAlign = "center";
@@ -822,11 +853,17 @@ function drawExportHeader(context, width) {
 
 async function drawExportMetrics(context, series) {
   const startX = 190;
-  const cardWidth = 185;
+  const cardWidth = 160;
   const top = 92;
+  const entries = buildExportMetricEntries(series);
 
-  for (const [index, item] of series.slice(0, 7).entries()) {
+  for (const [index, item] of entries.entries()) {
     const x = startX + index * cardWidth;
+    if (item.type === "historical") {
+      drawExportHistoricalMetric(context, x, top);
+      continue;
+    }
+
     const calculatedAverage =
       item.points.reduce((sum, point) => sum + point.value, 0) / item.points.length;
     const average = summary[item.header]?.average;
@@ -864,6 +901,41 @@ async function drawExportMetrics(context, series) {
   }
 }
 
+function buildExportMetricEntries(series) {
+  const entries = [...series];
+  const globoIndex = entries.findIndex((item) => item.key === "GLOBO");
+  const historicalEntry = { type: "historical" };
+
+  if (globoIndex < 0) return [historicalEntry, ...entries].slice(0, 8);
+
+  entries.splice(globoIndex + 1, 0, historicalEntry);
+  return entries.slice(0, 8);
+}
+
+function drawExportHistoricalMetric(context, x, top) {
+  const audience = historicalAudience.value.trim() || "-";
+  const variation = historicalShare.value.trim()
+    ? formatVariationInput(historicalShare.value)
+    : "-";
+  const variationNumber = parseNumber(variation);
+  const accentColor = getSignedColor(variationNumber);
+
+  context.fillStyle = accentColor;
+  context.fillRect(x + 12, top + 2, 3, 74);
+  context.font = "900 17px Globotipo, Arial, sans-serif";
+  context.textAlign = "left";
+  context.fillText(audience, x + 24, top + 18);
+  context.font = "400 12px Globotipo, Arial, sans-serif";
+  context.fillStyle = "#9b9b9b";
+  context.fillText("Média histórica", x + 24, top + 36);
+  context.fillStyle = accentColor;
+  context.font = "900 15px Globotipo, Arial, sans-serif";
+  context.fillText(variation, x + 24, top + 57);
+  context.fillStyle = "#9b9b9b";
+  context.font = "400 12px Globotipo, Arial, sans-serif";
+  context.fillText("Variação", x + 24, top + 74);
+}
+
 function drawLogoImage(context, src, x, y, width, height) {
   return new Promise((resolve) => {
     const image = new Image();
@@ -878,6 +950,25 @@ function drawLogoImage(context, src, x, y, width, height) {
   });
 }
 
+function drawLogoImageContain(context, src, x, y, width, height) {
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.onload = () => {
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = "high";
+      const scale = Math.min(width / image.width, height / image.height);
+      const drawWidth = image.width * scale;
+      const drawHeight = image.height * scale;
+      const drawX = x + (width - drawWidth) / 2;
+      const drawY = y + (height - drawHeight) / 2;
+      context.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+      resolve();
+    };
+    image.onerror = resolve;
+    image.src = src;
+  });
+}
+
 function getLogoSource(item) {
   return item.imageKey ? window.logoData?.[item.imageKey] : null;
 }
@@ -885,7 +976,27 @@ function getLogoSource(item) {
 async function drawTvGloboLogo(context, width) {
   const src = window.logoData?.TVGLOBO;
   if (!src) return;
-  await drawLogoImage(context, src, width - 202, 28, 174, 42);
+  await drawLogoImage(context, src, width - 202, 26, 174, 42);
+}
+
+function getProgramLogoSource(programName) {
+  const normalizedName = normalize(programName);
+  if (normalizedName === "df1") return window.logoData?.PROGRAMA_DF1;
+  if (normalizedName === "df2") return window.logoData?.PROGRAMA_DF2;
+  if (normalizedName === "bom dia df") return window.logoData?.PROGRAMA_BOM_DIA_DF;
+  if (normalizedName === "globo comunidade" || normalizedName === "gco") {
+    return window.logoData?.PROGRAMA_GLOBO_COMUNIDADE;
+  }
+  return null;
+}
+
+function getProgramLogoSize(programName) {
+  const normalizedName = normalize(programName);
+  if (normalizedName === "bom dia df") return { width: 153, height: 42 };
+  if (normalizedName === "globo comunidade" || normalizedName === "gco") {
+    return { width: 210, height: 42 };
+  }
+  return { width: 174, height: 42 };
 }
 
 function drawExportFooter(context, width, height) {
@@ -939,6 +1050,15 @@ function updateSignedInput(input) {
   input.classList.toggle("positive", Number.isFinite(value) && value > 0);
 }
 
+function formatVariationInput(value) {
+  const number = parseNumber(value);
+  if (!Number.isFinite(number)) return value.trim();
+
+  const formatted = numberFormatter.format(Math.abs(number));
+  const sign = number > 0 ? "+" : number < 0 ? "-" : "";
+  return `${sign}${formatted}%`;
+}
+
 downloadImageButton.addEventListener("click", downloadCleanImage);
 
 function loadCsvText(text) {
@@ -978,6 +1098,11 @@ addIntervalButton.addEventListener("click", () => {
   input.addEventListener("input", () => {
     updateSignedInput(input);
   });
+});
+
+historicalShare.addEventListener("blur", () => {
+  historicalShare.value = formatVariationInput(historicalShare.value);
+  updateSignedInput(historicalShare);
 });
 
 window.addEventListener("resize", () => {
