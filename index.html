@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Gerar prévia</title>
+    <title>index</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -20,9 +20,12 @@
               aria-label="Nome do programa"
             />
           </div>
-          <button id="downloadImageButton" class="download-button" type="button">
-            Baixar imagem
-          </button>
+          <div class="download-actions">
+            <span id="downloadWarning" class="download-warning" role="status"></span>
+            <button id="downloadImageButton" class="download-button" type="button">
+              Baixar imagem
+            </button>
+          </div>
         </header>
 
         <section class="presentation-toolbar" aria-label="Apresentação">

@@ -9,6 +9,7 @@ const marketBadge = document.querySelector("#marketBadge");
 const intervalList = document.querySelector("#intervalList");
 const addIntervalButton = document.querySelector("#addIntervalButton");
 const downloadImageButton = document.querySelector("#downloadImageButton");
+const downloadWarning = document.querySelector("#downloadWarning");
 const historicalAudience = document.querySelector("#historicalAudience");
 const historicalShare = document.querySelector("#historicalShare");
 const presenterName = document.querySelector("#presenterName");
@@ -757,9 +758,12 @@ function pickTimeIndexes(points) {
 
 async function downloadCleanImage() {
   if (!rows.length || !emptyState.hidden) {
-    statusText.textContent = "Importe um CSV antes de baixar a imagem.";
+    downloadWarning.textContent = "Importe um CSV antes de baixar a imagem.";
+    statusText.textContent = "";
     return;
   }
+
+  downloadWarning.textContent = "";
 
   const width = 1600;
   const height = 900;
@@ -803,7 +807,7 @@ async function drawExportHeader(context, width) {
   context.textAlign = "left";
   context.fillText("AUDIÊNCIA PRÉVIA", 28, 48);
 
-  const badgeText = marketBadge.value || "DF1";
+  const badgeText = marketBadge.value || "PROGRAMA";
   const programLogo = getProgramLogoSource(badgeText);
   let badgeX = 330;
   let badgeWidth = 0;
@@ -987,12 +991,14 @@ function getProgramLogoSource(programName) {
   if (normalizedName === "globo comunidade" || normalizedName === "gco") {
     return window.logoData?.PROGRAMA_GLOBO_COMUNIDADE;
   }
+  if (normalizedName === "globo esporte") return window.logoData?.PROGRAMA_GLOBO_ESPORTE;
   return null;
 }
 
 function getProgramLogoSize(programName) {
   const normalizedName = normalize(programName);
   if (normalizedName === "bom dia df") return { width: 153, height: 42 };
+  if (normalizedName === "globo esporte") return { width: 174, height: 42 };
   if (normalizedName === "globo comunidade" || normalizedName === "gco") {
     return { width: 210, height: 42 };
   }
@@ -1062,6 +1068,7 @@ function formatVariationInput(value) {
 downloadImageButton.addEventListener("click", downloadCleanImage);
 
 function loadCsvText(text) {
+  downloadWarning.textContent = "";
   const parsed = parseCsv(text, "auto");
   headers = parsed.parsedHeaders;
   rows = parsed.parsedRows;
@@ -1083,6 +1090,20 @@ async function handleFileSelection(event) {
 }
 
 emptyCsvInput.addEventListener("change", handleFileSelection);
+
+function clearTextOnFocus(input, afterClear) {
+  input.addEventListener("focus", () => {
+    input.value = "";
+    afterClear?.();
+  });
+}
+
+clearTextOnFocus(marketBadge, () => {
+  marketBadge.dataset.userEdited = "true";
+  resizeMarketBadge();
+});
+
+clearTextOnFocus(presenterName);
 
 marketBadge.addEventListener("input", () => {
   marketBadge.dataset.userEdited = "true";

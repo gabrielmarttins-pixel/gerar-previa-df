@@ -69,7 +69,21 @@ body {
   justify-self: auto;
 }
 
-.download-button {
+.download-actions {
+  display: flex;
+  align-items: center;
+  justify-self: end;
+  gap: 12px;
+}
+
+.download-warning {
+  color: #e95145;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.download-actions .download-button {
   justify-self: end;
 }
 
@@ -473,6 +487,12 @@ input[type="time"] {
   .footer-row {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .download-actions {
+    justify-self: stretch;
+    justify-content: flex-end;
+    flex-wrap: wrap;
   }
 
   .interval-toolbar {
