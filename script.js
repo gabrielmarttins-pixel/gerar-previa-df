@@ -992,6 +992,7 @@ function getProgramLogoSource(programName) {
     return window.logoData?.PROGRAMA_GLOBO_COMUNIDADE;
   }
   if (normalizedName === "globo esporte") return window.logoData?.PROGRAMA_GLOBO_ESPORTE;
+  if (normalizedName === "boletim df2") return window.logoData?.PROGRAMA_BOLETIM_DF2;
   return null;
 }
 
@@ -999,6 +1000,7 @@ function getProgramLogoSize(programName) {
   const normalizedName = normalize(programName);
   if (normalizedName === "bom dia df") return { width: 153, height: 42 };
   if (normalizedName === "globo esporte") return { width: 174, height: 42 };
+  if (normalizedName === "boletim df2") return { width: 174, height: 42 };
   if (normalizedName === "globo comunidade" || normalizedName === "gco") {
     return { width: 210, height: 42 };
   }
