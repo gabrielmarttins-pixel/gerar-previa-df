@@ -8,6 +8,8 @@ const reportRange = document.querySelector("#reportRange");
 const marketBadge = document.querySelector("#marketBadge");
 const intervalList = document.querySelector("#intervalList");
 const addIntervalButton = document.querySelector("#addIntervalButton");
+const localParticipationList = document.querySelector("#localParticipationList");
+const addLocalParticipationButton = document.querySelector("#addLocalParticipationButton");
 const downloadImageButton = document.querySelector("#downloadImageButton");
 const downloadWarning = document.querySelector("#downloadWarning");
 const historicalAudience = document.querySelector("#historicalAudience");
@@ -492,7 +494,28 @@ function drawMultiLineChartOnContext(context, series, activeHeader, bounds) {
 }
 
 function drawVerticalBand(context, points, padding, plotWidth, plotHeight) {
-  getIntervals().forEach(({ start, end }) => {
+  drawTimeBands(
+    context,
+    points,
+    padding,
+    plotWidth,
+    plotHeight,
+    getIntervals(),
+    "rgba(0, 0, 0, 0.035)",
+  );
+  drawTimeBands(
+    context,
+    points,
+    padding,
+    plotWidth,
+    plotHeight,
+    getLocalParticipations(),
+    "rgba(255, 220, 92, 0.28)",
+  );
+}
+
+function drawTimeBands(context, points, padding, plotWidth, plotHeight, ranges, color) {
+  ranges.forEach(({ start, end }) => {
     const startIndex = findClosestTimeIndex(points, start);
     const endIndex = findClosestTimeIndex(points, end);
     if (startIndex < 0 || endIndex < 0) return;
@@ -503,7 +526,7 @@ function drawVerticalBand(context, points, padding, plotWidth, plotHeight) {
     const bandEndX = xFor(toIndex, points.length, padding.left, plotWidth);
     const bandWidth = Math.max(8, bandEndX - bandX);
 
-    context.fillStyle = "rgba(0, 0, 0, 0.035)";
+    context.fillStyle = color;
     context.fillRect(bandX, padding.top, bandWidth, plotHeight);
   });
 }
@@ -515,6 +538,15 @@ function getIntervals() {
       end: row.querySelector(".interval-end").value,
     }))
     .filter((interval) => interval.start && interval.end);
+}
+
+function getLocalParticipations() {
+  return [...localParticipationList.querySelectorAll(".local-participation-row")]
+    .map((row) => ({
+      start: row.querySelector(".local-participation-start").value,
+      end: row.querySelector(".local-participation-end").value,
+    }))
+    .filter((participation) => participation.start && participation.end);
 }
 
 function addIntervalRow(start = "", end = "") {
@@ -543,6 +575,34 @@ function addIntervalRow(start = "", end = "") {
   });
 
   intervalList.appendChild(row);
+}
+
+function addLocalParticipationRow(start = "", end = "") {
+  const row = document.createElement("div");
+  row.className = "interval-row local-participation-row";
+  row.innerHTML = `
+    <label>
+      Inicio
+      <input class="local-participation-start" type="time" value="${start}" />
+    </label>
+    <label>
+      Fim
+      <input class="local-participation-end" type="time" value="${end}" />
+    </label>
+    <button class="remove-interval-button" type="button" aria-label="Remover participacao local">x</button>
+  `;
+
+  row.querySelectorAll("input").forEach((input) => {
+    input.addEventListener("change", updateChart);
+  });
+
+  row.querySelector(".remove-interval-button").addEventListener("click", () => {
+    row.remove();
+    if (!localParticipationList.children.length) addLocalParticipationRow();
+    updateChart();
+  });
+
+  localParticipationList.appendChild(row);
 }
 
 function findClosestTimeIndex(points, time) {
@@ -580,6 +640,13 @@ function drawAxisLabels(context, points, padding, plotWidth, height) {
   context.textBaseline = "middle";
   context.font = "11px Globotipo, Arial, sans-serif";
   context.fillText("Intervalo", padding.left + 59, 20);
+
+  if (getLocalParticipations().length) {
+    context.fillStyle = "#fff3b8";
+    context.fillRect(padding.left + 126, 6, 158, 28);
+    context.fillStyle = "#9c7a00";
+    context.fillText("Participação local", padding.left + 205, 20);
+  }
   context.textBaseline = "alphabetic";
 }
 
@@ -678,26 +745,44 @@ function drawGloboHighlightLabel(
   const x = xFor(index, item.points.length, padding.left, plotWidth);
   const y = yFor(point.value, padding.top, plotHeight, minValue, range);
   const valueText = numberFormatter.format(point.value);
-  const boxWidth = Math.max(104, context.measureText(caption).width + 18);
-  const boxHeight = 35;
+  context.font = "800 12px Globotipo, Arial, sans-serif";
+  const captionWidth = context.measureText(caption).width;
+  context.font = "900 17px Globotipo, Arial, sans-serif";
+  const valueWidth = context.measureText(valueText).width;
+  const boxWidth = Math.max(138, Math.max(captionWidth, valueWidth) + 24);
+  const boxHeight = 48;
   const boxX = Math.min(Math.max(4, x - boxWidth / 2), padding.left + plotWidth - boxWidth);
   const boxY = Math.min(Math.max(8, y + offset), padding.top + plotHeight - boxHeight - 4);
 
-  context.fillStyle = "rgba(155, 160, 255, 0.95)";
-  roundRect(context, boxX, boxY, boxWidth, boxHeight, 6);
+  context.save();
+  context.shadowColor = "rgba(0, 0, 0, 0.18)";
+  context.shadowBlur = 8;
+  context.shadowOffsetY = 2;
+  context.fillStyle = "rgba(11, 54, 184, 0.96)";
+  roundRect(context, boxX, boxY, boxWidth, boxHeight, 8);
   context.fill();
+  context.restore();
 
-  context.fillStyle = "#0b36b8";
+  context.strokeStyle = "rgba(255, 255, 255, 0.9)";
+  context.lineWidth = 1.5;
+  roundRect(context, boxX, boxY, boxWidth, boxHeight, 8);
+  context.stroke();
+
   context.textAlign = "center";
-  context.font = "900 12px Globotipo, Arial, sans-serif";
-  context.fillText(valueText, boxX + boxWidth / 2, boxY + 14);
-  context.font = "400 9px Globotipo, Arial, sans-serif";
-  context.fillText(caption, boxX + boxWidth / 2, boxY + 27);
+  context.fillStyle = "#ffffff";
+  context.font = "900 17px Globotipo, Arial, sans-serif";
+  context.fillText(valueText, boxX + boxWidth / 2, boxY + 20);
+  context.fillStyle = "#dfe8ff";
+  context.font = "800 12px Globotipo, Arial, sans-serif";
+  context.fillText(caption, boxX + boxWidth / 2, boxY + 38);
 
   context.fillStyle = "#0b36b8";
   context.beginPath();
-  context.arc(x, y, 3.8, 0, Math.PI * 2);
+  context.arc(x, y, 5.2, 0, Math.PI * 2);
   context.fill();
+  context.strokeStyle = "#ffffff";
+  context.lineWidth = 2;
+  context.stroke();
 }
 
 function drawPointLabel(context, item, index, padding, plotWidth, plotHeight, minValue, range) {
@@ -993,6 +1078,9 @@ function getProgramLogoSource(programName) {
   }
   if (normalizedName === "globo esporte") return window.logoData?.PROGRAMA_GLOBO_ESPORTE;
   if (normalizedName === "boletim df2") return window.logoData?.PROGRAMA_BOLETIM_DF2;
+  if (normalizedName === "bom dia brasil" || normalizedName === "bdbr") {
+    return window.logoData?.PROGRAMA_BOM_DIA_BRASIL;
+  }
   return null;
 }
 
@@ -1001,6 +1089,9 @@ function getProgramLogoSize(programName) {
   if (normalizedName === "bom dia df") return { width: 153, height: 42 };
   if (normalizedName === "globo esporte") return { width: 174, height: 42 };
   if (normalizedName === "boletim df2") return { width: 174, height: 42 };
+  if (normalizedName === "bom dia brasil" || normalizedName === "bdbr") {
+    return { width: 174, height: 42 };
+  }
   if (normalizedName === "globo comunidade" || normalizedName === "gco") {
     return { width: 210, height: 42 };
   }
@@ -1117,6 +1208,10 @@ addIntervalButton.addEventListener("click", () => {
   addIntervalRow();
 });
 
+addLocalParticipationButton.addEventListener("click", () => {
+  addLocalParticipationRow();
+});
+
 [historicalAudience, historicalShare].forEach((input) => {
   input.addEventListener("input", () => {
     updateSignedInput(input);
@@ -1135,3 +1230,4 @@ window.addEventListener("resize", () => {
 
 resizeMarketBadge();
 addIntervalRow();
+addLocalParticipationRow();

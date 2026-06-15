@@ -272,6 +272,11 @@ h1 {
   background: #fafafa;
 }
 
+.local-participation-fields {
+  border-color: #f1df9b;
+  background: #fffbea;
+}
+
 .history-fields {
   grid-template-columns: auto 112px 112px;
   align-items: end;
@@ -320,6 +325,10 @@ h1 {
 
 .interval-heading button {
   padding: 0 12px;
+}
+
+.local-participation-heading button {
+  background: #d3a100;
 }
 
 .interval-list {
