@@ -848,6 +848,18 @@ async function downloadCleanImage() {
     return;
   }
 
+  const missingFields = getMissingDownloadFields();
+  if (missingFields.length) {
+    downloadWarning.textContent = `Preencha ${missingFields.join(" e ")} antes de baixar a imagem.`;
+    statusText.textContent = "";
+    if (missingFields[0] === "o nome do PROGRAMA") {
+      marketBadge.focus();
+    } else {
+      presenterName.focus();
+    }
+    return;
+  }
+
   downloadWarning.textContent = "";
 
   const width = 1600;
@@ -1002,7 +1014,9 @@ function buildExportMetricEntries(series) {
 }
 
 function drawExportHistoricalMetric(context, x, top) {
-  const audience = historicalAudience.value.trim() || "-";
+  const audience = historicalAudience.value.trim()
+    ? formatSignedMetricValue(historicalAudience.value)
+    : "-";
   const variation = historicalShare.value.trim()
     ? formatVariationInput(historicalShare.value)
     : "-";
@@ -1066,6 +1080,14 @@ async function drawTvGloboLogo(context, width) {
   const src = window.logoData?.TVGLOBO;
   if (!src) return;
   await drawLogoImage(context, src, width - 202, 26, 174, 42);
+}
+
+function getMissingDownloadFields() {
+  const program = normalize(marketBadge.value);
+  const missing = [];
+  if (!program || program === "programa") missing.push("o nome do PROGRAMA");
+  if (!presenterName.value.trim()) missing.push("o nome do Apresentador");
+  return missing;
 }
 
 function getProgramLogoSource(programName) {
@@ -1170,6 +1192,15 @@ function formatVariationInput(value) {
   return `${sign}${formatted}%`;
 }
 
+function formatSignedMetricValue(value) {
+  const number = parseNumber(value);
+  if (!Number.isFinite(number)) return value.trim();
+
+  const formatted = numberFormatter.format(Math.abs(number));
+  const sign = number > 0 ? "+" : number < 0 ? "-" : "";
+  return `${sign}${formatted}`;
+}
+
 downloadImageButton.addEventListener("click", downloadCleanImage);
 
 function loadCsvText(text) {
@@ -1211,9 +1242,14 @@ clearTextOnFocus(marketBadge, () => {
 clearTextOnFocus(presenterName);
 
 marketBadge.addEventListener("input", () => {
+  downloadWarning.textContent = "";
   marketBadge.dataset.userEdited = "true";
   marketBadge.value = marketBadge.value.toUpperCase();
   resizeMarketBadge();
+});
+
+presenterName.addEventListener("input", () => {
+  downloadWarning.textContent = "";
 });
 
 addIntervalButton.addEventListener("click", () => {
