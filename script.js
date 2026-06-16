@@ -1070,13 +1070,18 @@ async function drawTvGloboLogo(context, width) {
 
 function getProgramLogoSource(programName) {
   const normalizedName = normalize(programName);
-  if (normalizedName === "df1") return window.logoData?.PROGRAMA_DF1;
-  if (normalizedName === "df2") return window.logoData?.PROGRAMA_DF2;
-  if (normalizedName === "bom dia df") return window.logoData?.PROGRAMA_BOM_DIA_DF;
+  const compactName = normalizedName.replace(/\s+/g, "");
+  if (compactName === "df1") return window.logoData?.PROGRAMA_DF1;
+  if (compactName === "df2") return window.logoData?.PROGRAMA_DF2;
+  if (normalizedName === "bom dia df" || compactName === "bddf") {
+    return window.logoData?.PROGRAMA_BOM_DIA_DF;
+  }
   if (normalizedName === "globo comunidade" || normalizedName === "gco") {
     return window.logoData?.PROGRAMA_GLOBO_COMUNIDADE;
   }
-  if (normalizedName === "globo esporte") return window.logoData?.PROGRAMA_GLOBO_ESPORTE;
+  if (normalizedName === "globo esporte" || compactName === "ge") {
+    return window.logoData?.PROGRAMA_GLOBO_ESPORTE;
+  }
   if (normalizedName === "boletim df2") return window.logoData?.PROGRAMA_BOLETIM_DF2;
   if (normalizedName === "bom dia brasil" || normalizedName === "bdbr") {
     return window.logoData?.PROGRAMA_BOM_DIA_BRASIL;
@@ -1086,8 +1091,9 @@ function getProgramLogoSource(programName) {
 
 function getProgramLogoSize(programName) {
   const normalizedName = normalize(programName);
-  if (normalizedName === "bom dia df") return { width: 153, height: 42 };
-  if (normalizedName === "globo esporte") return { width: 174, height: 42 };
+  const compactName = normalizedName.replace(/\s+/g, "");
+  if (normalizedName === "bom dia df" || compactName === "bddf") return { width: 153, height: 42 };
+  if (normalizedName === "globo esporte" || compactName === "ge") return { width: 174, height: 42 };
   if (normalizedName === "boletim df2") return { width: 174, height: 42 };
   if (normalizedName === "bom dia brasil" || normalizedName === "bdbr") {
     return { width: 174, height: 42 };
@@ -1101,6 +1107,12 @@ function getProgramLogoSize(programName) {
 function drawExportFooter(context, width, height) {
   context.fillStyle = "#8a8a8a";
   context.font = "italic 12px Globotipo, Arial, sans-serif";
+  context.textAlign = "left";
+  context.fillText(
+    "Modelo desenvolvido pela área de Programação da TV Globo DF",
+    28,
+    height - 18,
+  );
   context.textAlign = "right";
   context.fillText(
     "Fonte: Ibope. DF. Dados prévios. 1 pt de audiência domiciliar no DF equivale a 10.034 domicílios.",
