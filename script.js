@@ -510,7 +510,7 @@ function drawVerticalBand(context, points, padding, plotWidth, plotHeight) {
     plotWidth,
     plotHeight,
     getLocalParticipations(),
-    "rgba(255, 220, 92, 0.28)",
+    "rgba(246, 172, 142, 0.34)",
   );
 }
 
@@ -642,9 +642,9 @@ function drawAxisLabels(context, points, padding, plotWidth, height) {
   context.fillText("Intervalo", padding.left + 59, 20);
 
   if (getLocalParticipations().length) {
-    context.fillStyle = "#fff3b8";
+    context.fillStyle = "#f6ac8e";
     context.fillRect(padding.left + 126, 6, 158, 28);
-    context.fillStyle = "#9c7a00";
+    context.fillStyle = "#7a321c";
     context.fillText("Participação local", padding.left + 205, 20);
   }
   context.textBaseline = "alphabetic";
