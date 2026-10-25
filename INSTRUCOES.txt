@@ -6,7 +6,7 @@ Como abrir a aplicacao
 2. De dois cliques em:
    abrir-aplicacao.cmd
 
-3. Quando a pagina abrir no navegador, clique em "Importar CSV".
+3. Quando a pagina abrir no navegador, selecione o CSV de audiencia diaria.
 
 4. Escolha o arquivo:
    C:\Users\gamartin\Downloads\realtime.csv

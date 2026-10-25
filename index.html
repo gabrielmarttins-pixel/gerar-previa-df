@@ -11,7 +11,7 @@
       <section class="dashboard">
         <header class="masthead">
           <div class="brand-block">
-            <h1>AUDIÊNCIA PRÉVIA</h1>
+            <h1>DESEMPENHO PRÉVIO</h1>
             <input
               class="market-badge"
               id="marketBadge"
@@ -19,19 +19,55 @@
               value="PROGRAMA"
               aria-label="Nome do programa"
             />
+            <div id="presenterPreview" class="presenter-preview" aria-live="polite"></div>
           </div>
           <div class="download-actions">
             <span id="downloadWarning" class="download-warning" role="status"></span>
+            <label class="base-upload-button" for="baseFilesInput">
+              Enviar bases
+              <input id="baseFilesInput" type="file" accept=".csv,.pdf,.xlsx,text/csv,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple />
+            </label>
             <button id="downloadImageButton" class="download-button" type="button">
-              Baixar imagem
+              Gerar arquivos
             </button>
           </div>
         </header>
+        <div id="baseStatus" class="base-status" role="status">Realtime obrigatório · Maestro, iNews e participação local (BDBR) opcionais</div>
 
-        <section class="presentation-toolbar" aria-label="Apresentação">
-          <label>
-            Apresentação
-            <input id="presenterName" type="text" placeholder="Nome do apresentador" />
+        <section class="presentation-toolbar" aria-label="Seleção de apresentadores">
+          <label aria-label="Seleção de apresentadores">
+            <span class="presenter-control">
+              <span class="presenter-choice">
+                <select id="presenterName" aria-label="Primeiro apresentador">
+                  <option value="">APRESENTADOR 1</option>
+                  <option>FRED FERREIRA</option>
+                  <option>LUÍSA DOYLE</option>
+                  <option>HERALDO PEREIRA</option>
+                  <option>NATALIA GODOY</option>
+                  <option>ANDRÉ BARROSO</option>
+                  <option>KARINA AZEVEDO</option>
+                  <option>ANTÔNIO DE CASTRO</option>
+                  <option>RAIANE SENA</option>
+                  <option value="OUTRO">OUTRO</option>
+                </select>
+                <input id="presenterOtherName" type="text" placeholder="DIGITE O NOME" hidden />
+              </span>
+              <span class="presenter-choice">
+                <select id="presenterName2" aria-label="Segundo apresentador">
+                  <option value="">APRESENTADOR 2 (OPCIONAL)</option>
+                  <option>FRED FERREIRA</option>
+                  <option>LUÍSA DOYLE</option>
+                  <option>HERALDO PEREIRA</option>
+                  <option>NATALIA GODOY</option>
+                  <option>ANDRÉ BARROSO</option>
+                  <option>KARINA AZEVEDO</option>
+                  <option>ANTÔNIO DE CASTRO</option>
+                  <option>RAIANE SENA</option>
+                  <option value="OUTRO">OUTRO</option>
+                </select>
+                <input id="presenterOtherName2" type="text" placeholder="DIGITE O SEGUNDO NOME" hidden />
+              </span>
+            </span>
           </label>
         </section>
 
@@ -55,6 +91,11 @@
               <input id="historicalShare" class="signed-input" type="text" inputmode="decimal" placeholder="0,0%" />
             </label>
           </div>
+          <div id="productionFallback" class="production-fallback" hidden>
+            <label for="manualProductionTotal">Produção total (manual)</label>
+            <input id="manualProductionTotal" type="text" inputmode="numeric" placeholder="MM:SS ou HH:MM:SS" aria-describedby="productionHelp" />
+            <small id="productionHelp">Preencha se o Maestro não informar a produção.</small>
+          </div>
           <div class="interval-fields">
             <div class="interval-heading">
               <span>Intervalos</span>
@@ -74,12 +115,8 @@
         <section class="chart-area">
           <canvas id="audienceChart"></canvas>
           <div id="emptyState" class="empty-state">
-            <strong>Importe o CSV de realtime</strong>
-            <span>As linhas de audiência aparecem aqui com as cores das emissoras.</span>
-            <label class="empty-upload-button">
-              <input id="emptyCsvInput" type="file" accept=".csv,text/csv" />
-              <span>Selecionar arquivo CSV</span>
-            </label>
+            <strong>Envie a base de audiência minuto a minuto</strong>
+            <span>Use “Enviar bases” acima. Maestro, iNews e participação local (BDBR) são opcionais.</span>
           </div>
         </section>
 
@@ -90,7 +127,50 @@
       </section>
     </main>
 
+    <dialog id="inewsJournalDialog" class="inews-journal-dialog" aria-labelledby="inewsJournalTitle">
+      <h2 id="inewsJournalTitle">Qual jornal deseja importar?</h2>
+      <p>Este PDF contém os espelhos do DF2 e do Boletim DF2.</p>
+      <div class="inews-journal-options">
+        <button type="button" data-inews-journal="df2">DF2</button>
+        <button type="button" data-inews-journal="boletim-df2">Boletim DF2</button>
+      </div>
+    </dialog>
+
+    <dialog id="programSelectionDialog" class="program-selection-dialog" aria-labelledby="programSelectionTitle">
+      <form id="programSelectionForm">
+        <h2 id="programSelectionTitle">Qual programa deseja gerar?</h2>
+        <p id="programSelectionHint">Selecione o programa para recortar a audiência.</p>
+        <label for="programSelection">Programa</label>
+        <select id="programSelection" required>
+          <option value="">Selecione</option>
+          <option>BOM DIA DF</option>
+          <option>BOM DIA BRASIL</option>
+          <option>DF1</option>
+          <option>GLOBO ESPORTE</option>
+          <option>BOLETIM DF2</option>
+          <option>DF2</option>
+          <option>GLOBO COMUNIDADE</option>
+          <option value="OUTRO">OUTRO</option>
+        </select>
+        <div id="otherProgramFields" class="other-program-fields" hidden>
+          <label for="otherProgramName">Nome do programa</label>
+          <input id="otherProgramName" type="text" placeholder="NOME DO PROGRAMA" />
+          <label for="otherProgramStart">Início</label>
+          <input id="otherProgramStart" type="time" step="1" />
+          <label for="otherProgramEnd">Fim</label>
+          <input id="otherProgramEnd" type="time" step="1" />
+        </div>
+        <div class="program-selection-actions">
+          <button id="cancelProgramSelection" type="button">Cancelar</button>
+          <button type="submit">Usar programa</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script src="./logo-data.js"></script>
+    <script src="./presenter-data.js"></script>
     <script src="./script.js"></script>
   </body>
 </html>
