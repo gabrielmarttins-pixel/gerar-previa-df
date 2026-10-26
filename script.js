@@ -3097,36 +3097,45 @@ async function parseInewsPdf(file) {
   const documentTask = window.pdfjsLib.getDocument({ data: await file.arrayBuffer() });
   const pdf = await documentTask.promise;
   const extracted = [];
+  let retrancaPage = null;
 
   for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
     const page = await pdf.getPage(pageNumber);
     const textContent = await page.getTextContent();
     const pageRows = groupPdfItemsByRow(textContent.items);
-    const headerRow = pageRows.find((row) =>
-      row.items.some((item) => normalize(item.text) === "retranca") &&
-      row.items.some((item) => normalize(item.text) === "tempo"),
-    );
-    if (!headerRow) continue;
+    const retrancaHeader = pageRows.find((row) =>
+      Number.isFinite(getPdfColumnX(row, "RETRANCA")) &&
+      Number.isFinite(getPdfColumnX(row, "tMat")));
+    const tempoHeader = pageRows.find((row) =>
+      Number.isFinite(getPdfColumnX(row, "TEMPO")) &&
+      Number.isFinite(getPdfColumnX(row, "STATUS")));
 
-    const retrancaX = getPdfColumnX(headerRow, "RETRANCA");
-    const repX = getPdfColumnX(headerRow, "Rep");
-    const tMatX = getPdfColumnX(headerRow, "tMat");
-    const mediaX =
-      getPdfColumnX(headerRow, "MÍDIA") ??
-      getPdfColumnX(headerRow, "MÉDIA") ??
-      getPdfColumnX(headerRow, "STATUS");
-    const tempoX = getPdfColumnX(headerRow, "TEMPO");
-    const okX = getPdfColumnX(headerRow, "OK");
-    if (![retrancaX, repX, tMatX, mediaX, tempoX, okX].every(Number.isFinite)) continue;
+    if (retrancaHeader) {
+      const retrancaX = getPdfColumnX(retrancaHeader, "RETRANCA");
+      const repX = getPdfColumnX(retrancaHeader, "Rep") ?? getPdfColumnX(retrancaHeader, "LOC");
+      const tMatX = getPdfColumnX(retrancaHeader, "tMat");
+      if (![retrancaX, repX, tMatX].every(Number.isFinite)) continue;
+      retrancaPage = pageRows
+        .filter((row) => row.y < retrancaHeader.y - 2)
+        .map((row) => ({
+          y: row.y,
+          title: getPdfCellText(row, retrancaX - 3, repX - 1),
+          duration: getPdfCellText(row, tMatX - 3, Infinity).match(/\d{1,2}:\d{2}(?::\d{2})?/)?.[0] ?? "",
+        }));
+    }
 
-    const dataRows = pageRows.filter((row) => row.y < headerRow.y - 2);
-    for (const row of dataRows) {
-      const title = getPdfCellText(row, retrancaX - 3, repX - 1);
-      const durationCell = getPdfCellText(row, tMatX - 14, mediaX - 1);
-      const rowText = row.items.map((item) => item.text).join(" ");
-      const duration = durationCell.match(/\b\d{1,2}:\d{2}(?::\d{2})?\b/)?.[0] ?? "";
-      const time = rowText.match(/\b\d{1,2}:\d{2}:\d{2}\b/)?.[0] ?? "";
-      if (title && time) extracted.push({ title, time, duration });
+    // O PDF do iNews pode imprimir as colunas largas em páginas consecutivas:
+    // retranca/tMat na primeira e TEMPO na segunda, com as linhas na mesma altura.
+    if (tempoHeader && retrancaPage) {
+      const timeRows = pageRows.filter((row) => row.y < tempoHeader.y - 2);
+      for (const item of retrancaPage) {
+        const matchingRow = timeRows.find((row) => Math.abs(row.y - item.y) <= 3);
+        // Em algumas linhas o PDF une MODI, APV e TEMPO em um único item de texto.
+        const time = matchingRow?.items.map((part) => part.text).join(" ")
+          .match(/\d{1,2}:\d{2}:\d{2}/)?.[0];
+        if (item.title && time) extracted.push({ title: item.title, time, duration: item.duration });
+      }
+      retrancaPage = null;
     }
   }
 
@@ -3381,7 +3390,7 @@ function askInewsJournal() {
 
 async function selectInewsMirror(items) {
   const closingIndexes = items
-    .map((item, index) => (normalize(item.title).includes("encerramento") ? index : -1))
+    .map((item, index) => (normalize(item.title).includes("encerr") ? index : -1))
     .filter((index) => index >= 0);
   const firstClosing = closingIndexes[0] ?? items.length;
   const bulletinStart = items.findIndex(
@@ -3435,7 +3444,7 @@ function shouldShowInewsItem(title) {
   const normalizedTitle = normalize(title);
   if (
     normalizedTitle.includes("intervalo") ||
-    normalizedTitle.includes("encerramento") ||
+    normalizedTitle.includes("encerr") ||
     normalizedTitle.includes("bloco local") ||
     normalizedTitle.includes("bloco rede") ||
     /^\s*\(av\)/.test(normalizedTitle)
