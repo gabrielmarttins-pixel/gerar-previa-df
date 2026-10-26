@@ -3108,7 +3108,9 @@ async function parseInewsPdf(file) {
       Number.isFinite(getPdfColumnX(row, "tMat")));
     const tempoHeader = pageRows.find((row) =>
       Number.isFinite(getPdfColumnX(row, "TEMPO")) &&
-      Number.isFinite(getPdfColumnX(row, "STATUS")));
+      (Number.isFinite(getPdfColumnX(row, "STATUS")) ||
+        (Number.isFinite(getPdfColumnX(row, "MODI")) &&
+          Number.isFinite(getPdfColumnX(row, "APV")))));
 
     if (retrancaHeader) {
       const retrancaX = getPdfColumnX(retrancaHeader, "RETRANCA");
@@ -3133,7 +3135,9 @@ async function parseInewsPdf(file) {
         // Em algumas linhas o PDF une MODI, APV e TEMPO em um único item de texto.
         const time = matchingRow?.items.map((part) => part.text).join(" ")
           .match(/\d{1,2}:\d{2}:\d{2}/)?.[0];
-        if (item.title && time) extracted.push({ title: item.title, time, duration: item.duration });
+        if (item.title && !/^\d{1,2}:\d{2}(?::\d{2})?$/.test(item.title) && time) {
+          extracted.push({ title: item.title, time, duration: item.duration });
+        }
       }
       retrancaPage = null;
     }
