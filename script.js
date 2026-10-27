@@ -3046,6 +3046,12 @@ async function handleBaseFilesSelection(event) {
     }
     updateImportWorkflow();
     updateChart();
+    if (isBomDiaBrasil() && inewsFileLoaded && !inewsItems.length) {
+      baseStatus.textContent += getLocalParticipations().some(({ start, end }) =>
+        Number.isFinite(timeToSeconds(start)) && Number.isFinite(timeToSeconds(end)))
+        ? " · iNews lido, mas o espelho não identifica retrancas dos blocos de participação local."
+        : " · iNews lido. Informe os horários de participação local para posicionar retrancas do BDBR.";
+    }
     if (optionalErrors.length) baseStatus.textContent += ` · ${optionalErrors.join(" · ")}`;
   } catch (error) {
     baseStatus.textContent = error.message;
@@ -3165,6 +3171,10 @@ function refreshInewsItems() {
 }
 
 function alignBdbInewsToLocalParticipations(items) {
+  // O espelho nacional do BDBR pode não conter as entradas locais. Sem um
+  // marcador explícito de bloco local, associar matérias nacionais às janelas
+  // regionais atribuiria retrancas erradas ao gráfico.
+  if (!items.some((item) => normalize(item.title).includes("bloco local"))) return [];
   const windows = getLocalParticipations()
     .map(({ start, end }) => ({ start: timeToSeconds(start), end: timeToSeconds(end) }))
     .filter(({ start, end }) => Number.isFinite(start) && Number.isFinite(end) && end > start)
@@ -3394,7 +3404,7 @@ function askInewsJournal() {
 
 async function selectInewsMirror(items) {
   const closingIndexes = items
-    .map((item, index) => (normalize(item.title).includes("encerr") ? index : -1))
+    .map((item, index) => (isInewsClosingTitle(item.title) ? index : -1))
     .filter((index) => index >= 0);
   const firstClosing = closingIndexes[0] ?? items.length;
   const bulletinStart = items.findIndex(
@@ -3448,7 +3458,7 @@ function shouldShowInewsItem(title) {
   const normalizedTitle = normalize(title);
   if (
     normalizedTitle.includes("intervalo") ||
-    normalizedTitle.includes("encerr") ||
+    isInewsClosingTitle(title) ||
     normalizedTitle.includes("bloco local") ||
     normalizedTitle.includes("bloco rede") ||
     /^\s*\(av\)/.test(normalizedTitle)
@@ -3456,6 +3466,12 @@ function shouldShowInewsItem(title) {
     return false;
   }
   return !/(^|[^a-z0-9])vh([^a-z0-9]|$)/.test(normalizedTitle);
+}
+
+function isInewsClosingTitle(title) {
+  const normalizedTitle = normalize(title);
+  return normalizedTitle.includes("encerramento") ||
+    /^[*\s]*encerra[*\s]*$/.test(normalizedTitle);
 }
 
 function clearTextOnFocus(input, afterClear) {
