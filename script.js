@@ -2693,10 +2693,15 @@ function getProgramSelectionBounds(programName, maestroRows) {
 
 function getAudienceRowsForSelection(parsed, selection) {
   const minuteHeader = parsed.parsedHeaders.find((header) => normalize(header) === "min") ?? "MIN";
-  return parsed.parsedRows.filter((row) => {
-    const minute = timeToTimelineSeconds(row[minuteHeader], selection.start);
-    return Number.isFinite(minute) && minute < selection.end && minute + 60 > selection.start;
-  });
+  return parsed.parsedRows
+    .filter((row) => {
+      const minute = timeToTimelineSeconds(row[minuteHeader], selection.start);
+      return Number.isFinite(minute) && minute < selection.end && minute + 60 > selection.start;
+    })
+    .sort((a, b) =>
+      timeToTimelineSeconds(a[minuteHeader], selection.start) -
+      timeToTimelineSeconds(b[minuteHeader], selection.start),
+    );
 }
 
 function askProgramSelection(maestroRows) {
