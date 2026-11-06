@@ -1306,7 +1306,7 @@ function drawSeriesLine({
         y: box.y + chartOffset.y,
       }));
     }
-    drawImportantMovements(
+    const movementBoxes = drawImportantMovements(
       context,
       item,
       padding,
@@ -1316,6 +1316,13 @@ function drawSeriesLine({
       range,
       highlightBoxes,
     );
+    if (highlightCollector) {
+      movementBoxes.forEach((box) => highlightCollector.push({
+        ...box,
+        x: box.x + chartOffset.x,
+        y: box.y + chartOffset.y,
+      }));
+    }
   } else {
     drawPointLabel(context, item, item.points.length - 1, padding, plotWidth, plotHeight, minValue, range);
   }
@@ -1337,14 +1344,15 @@ function drawImportantMovements(
   range,
   occupiedBoxes = [],
 ) {
-  if (item.points.length < 2) return;
+  if (item.points.length < 2) return [];
 
   const movements = buildAudienceTrendMovements(item.points);
   const rises = pickImportantMovements(movements.filter((movement) => movement.delta > 0));
   const falls = pickImportantMovements(movements.filter((movement) => movement.delta < 0));
 
-  rises.forEach((movement) =>
-    drawMovementLabel(
+  const boxes = [];
+  rises.forEach((movement) => {
+    const box = drawMovementLabel(
       context,
       item,
       movement,
@@ -1357,10 +1365,11 @@ function drawImportantMovements(
       minValue,
       range,
       occupiedBoxes,
-    ),
-  );
-  falls.forEach((movement) =>
-    drawMovementLabel(
+    );
+    if (box) boxes.push(box);
+  });
+  falls.forEach((movement) => {
+    const box = drawMovementLabel(
       context,
       item,
       movement,
@@ -1373,8 +1382,10 @@ function drawImportantMovements(
       minValue,
       range,
       occupiedBoxes,
-    ),
-  );
+    );
+    if (box) boxes.push(box);
+  });
+  return boxes;
 }
 
 function buildAudienceTrendMovements(points) {
@@ -1457,8 +1468,15 @@ function drawMovementLabel(
 
   const currentX = xFor(movement.index, item.points.length, padding.left, plotWidth);
   const currentY = yFor(current.value, padding.top, plotHeight, minValue, range);
+  const retranca = retrancaAtAudiencePoint(current.label, item.points[0]?.label);
   const boxWidth = 94;
   const boxHeight = 26;
+  context.font = "800 11px Globotipo, Arial, sans-serif";
+  const bubbleWidth = retranca
+    ? Math.min(230, plotWidth - 8, Math.max(86, context.measureText(retranca).width + 18))
+    : 0;
+  const bubbleLines = retranca ? wrapChartLabel(context, retranca, bubbleWidth - 18) : [];
+  const bubbleHeight = retranca ? Math.max(24, bubbleLines.length * 15 + 10) : 0;
   const initialBoxX = Math.min(
     Math.max(4, currentX - boxWidth / 2),
     padding.left + plotWidth - boxWidth,
@@ -1473,25 +1491,41 @@ function drawMovementLabel(
     { x: 0, y: preferredY - 32 },
     { x: 0, y: alternateY + 32 },
   ];
-  const candidates = candidateOffsets.map((candidate) => ({
-    x: Math.min(
+  const candidates = candidateOffsets.flatMap((candidate) => {
+    const x = Math.min(
       Math.max(4, initialBoxX + candidate.x),
       padding.left + plotWidth - boxWidth,
-    ),
-    y: Math.min(
+    );
+    const y = Math.min(
       Math.max(padding.top + 4, candidate.y),
       padding.top + plotHeight - boxHeight - 4,
-    ),
-    width: boxWidth,
-    height: boxHeight,
-  }));
+    );
+    const bubbleX = Math.min(
+      Math.max(4, x + (boxWidth - bubbleWidth) / 2),
+      padding.left + plotWidth - bubbleWidth,
+    );
+    const positions = retranca ? [y + boxHeight + 5, y - bubbleHeight - 5] : [0];
+    return positions.map((bubbleY) => ({
+      x, y, width: boxWidth, height: boxHeight,
+      bubble: retranca ? { x: bubbleX, y: bubbleY, width: bubbleWidth, height: bubbleHeight } : null,
+    }));
+  });
   const selectedBox = candidates.find(
-    (candidate) => !occupiedBoxes.some((occupied) => rectanglesOverlap(candidate, occupied, 6)),
+    (candidate) =>
+      (!candidate.bubble || (
+        candidate.bubble.y >= padding.top + 4 &&
+        candidate.bubble.y + candidate.bubble.height <= padding.top + plotHeight - 4
+      )) &&
+      !occupiedBoxes.some((occupied) =>
+        rectanglesOverlap(candidate, occupied, 6) ||
+        (candidate.bubble && rectanglesOverlap(candidate.bubble, occupied, 6)),
+      ),
   );
   if (!selectedBox) return;
   const boxX = selectedBox.x;
   const boxY = selectedBox.y;
   occupiedBoxes.push(selectedBox);
+  if (selectedBox.bubble) occupiedBoxes.push(selectedBox.bubble);
   const formattedDelta = `${movement.delta > 0 ? "+" : "-"}${numberFormatter.format(
     Math.abs(movement.delta),
   )}`;
@@ -1507,6 +1541,20 @@ function drawMovementLabel(
   context.textAlign = "center";
   context.font = "900 13px Globotipo, Arial, sans-serif";
   context.fillText(`${arrow} ${formattedDelta}`, boxX + boxWidth / 2, boxY + 18);
+  if (selectedBox.bubble) {
+    const bubble = selectedBox.bubble;
+    context.fillStyle = "#d9efff";
+    context.strokeStyle = "#71b9ed";
+    context.lineWidth = 1;
+    roundRect(context, bubble.x, bubble.y, bubble.width, bubble.height, 7);
+    context.fill();
+    context.stroke();
+    context.fillStyle = "#0b36a8";
+    context.font = "800 11px Globotipo, Arial, sans-serif";
+    bubbleLines.forEach((line, index) =>
+      context.fillText(line, bubble.x + bubble.width / 2, bubble.y + 17 + index * 15),
+    );
+  }
   context.beginPath();
   context.arc(currentX, currentY, 4.5, 0, Math.PI * 2);
   context.fill();
@@ -1514,6 +1562,86 @@ function drawMovementLabel(
   context.lineWidth = 1.5;
   context.stroke();
   context.restore();
+  return {
+    x: boxX, y: boxY, width: boxWidth, height: boxHeight,
+    caption: movement.delta > 0 ? "Aumento de audiência relevante" : "Queda de audiência relevante",
+    value: formattedDelta,
+    time: current.label,
+  };
+}
+
+function wrapChartLabel(context, text, maxWidth) {
+  const lines = [];
+  let line = "";
+  String(text).split(/\s+/).filter(Boolean).forEach((word) => {
+    const candidate = line ? `${line} ${word}` : word;
+    if (context.measureText(candidate).width <= maxWidth) {
+      line = candidate;
+      return;
+    }
+    if (line) lines.push(line);
+    line = "";
+    for (const character of word) {
+      if (line && context.measureText(line + character).width > maxWidth) {
+        lines.push(line);
+        line = "";
+      }
+      line += character;
+    }
+  });
+  if (line) lines.push(line);
+  return lines;
+}
+
+function retrancaAtAudiencePoint(pointTime, firstPointTime) {
+  if (!inewsItems.length) return "";
+  const timelineStart = timeToSeconds(firstPointTime);
+  const point = timeToTimelineSeconds(pointTime, timelineStart);
+  if (!Number.isFinite(point)) return "";
+  const intervals = getIntervals();
+  if (intervals.some(({ start, end }) =>
+    point >= timeToTimelineSeconds(start, timelineStart) &&
+    point < timeToTimelineSeconds(end, timelineStart),
+  )) return "";
+  const localWindows = isBomDiaBrasil() ? getLocalParticipations() : null;
+  if (localWindows && !localWindows.some(({ start, end }) =>
+    point >= timeToTimelineSeconds(start, timelineStart) &&
+    point < timeToTimelineSeconds(end, timelineStart),
+  )) return "";
+
+  const items = inewsItems.map((entry) => ({
+    ...entry,
+    start: timeToTimelineSeconds(entry.time, timelineStart),
+    durationSeconds: durationToSeconds(entry.duration),
+  })).filter((entry) => Number.isFinite(entry.start) && entry.durationSeconds > 0 &&
+    !intervals.some(({ start, end }) =>
+      entry.start >= timeToTimelineSeconds(start, timelineStart) &&
+      entry.start < timeToTimelineSeconds(end, timelineStart),
+    ) &&
+    (!localWindows || localWindows.some(({ start, end }) =>
+      entry.start >= timeToTimelineSeconds(start, timelineStart) &&
+      entry.start < timeToTimelineSeconds(end, timelineStart),
+    )))
+    .sort((a, b) => a.start - b.start);
+  const active = items.findLast((entry, index) => {
+    const nextStart = items[index + 1]?.start ?? Infinity;
+    const nextInterval = Math.min(Infinity, ...intervals
+      .map(({ start }) => timeToTimelineSeconds(start, timelineStart))
+      .filter((start) => start > entry.start));
+    const localEnd = localWindows
+      ? timeToTimelineSeconds(localWindows.find(({ start, end }) =>
+          entry.start >= timeToTimelineSeconds(start, timelineStart) &&
+          entry.start < timeToTimelineSeconds(end, timelineStart),
+        )?.end, timelineStart)
+      : Infinity;
+    return entry.start <= point && point < Math.min(
+      entry.start + entry.durationSeconds,
+      nextStart,
+      nextInterval,
+      Number.isFinite(localEnd) ? localEnd : Infinity,
+    );
+  });
+  return active?.title || "";
 }
 
 function rectanglesOverlap(first, second, gap = 0) {
@@ -2227,7 +2355,7 @@ function createInteractiveHtml(imageDataUrl, interactiveData, highlights, globot
 </head>
 <body>
   <main class="page">
-    <p class="hint">Passe o mouse ou use Tab sobre bolinhas e índices para ver os detalhes.</p>
+    <p class="hint">Passe o mouse ou use Tab sobre bolinhas, índices e setas para ver os detalhes.</p>
     <div class="visual">
       <img src="${imageDataUrl}" alt="Gráfico de desempenho prévio">
       <svg viewBox="0 0 1600 900" role="group" aria-label="Retrancas e índices interativos sobre o gráfico" id="markers">
