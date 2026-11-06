@@ -2854,6 +2854,10 @@ function getSelectedPresenterCards() {
     "KARINA AZEVEDO": "karina",
     "ANTÔNIO DE CASTRO": "antonio",
     "RAIANE SENA": "raiane",
+    "TALIA SANTOS": "talia",
+    "ANDRÉ GUIMARÃES": "andreg",
+    "FABIANO ANDRADE": "fabiano",
+    "KARLA LUCENA": "karla",
   };
   return [
     [presenterName, presenterOtherName],
