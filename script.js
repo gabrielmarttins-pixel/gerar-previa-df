@@ -1582,10 +1582,7 @@ function drawMovementLabel(
     const endY = boxY > currentY ? boxY : boxY + boxHeight;
     context.strokeStyle = color;
     context.lineWidth = 1;
-    context.beginPath();
-    context.moveTo(currentX, currentY);
-    context.lineTo(endX, endY);
-    context.stroke();
+    drawBdbMovementLeader(context, endX, endY, currentX, currentY, item.points, padding.left, plotWidth);
   }
   if (selectedBox.bubble && isBomDiaBrasil()) {
     const bubble = selectedBox.bubble;
@@ -1593,10 +1590,7 @@ function drawMovementLabel(
     const endY = bubble.y > currentY ? bubble.y : bubble.y + bubble.height;
     context.strokeStyle = "#71b9ed";
     context.lineWidth = 1.5;
-    context.beginPath();
-    context.moveTo(currentX, currentY);
-    context.lineTo(endX, endY);
-    context.stroke();
+    drawBdbMovementLeader(context, endX, endY, currentX, currentY, item.points, padding.left, plotWidth);
   }
   context.fillStyle = "rgba(255, 255, 255, 0.96)";
   context.strokeStyle = color;
@@ -1635,6 +1629,30 @@ function drawMovementLabel(
     value: formattedDelta,
     time: current.label,
   };
+}
+
+function drawBdbMovementLeader(context, fromX, fromY, toX, toY, points, plotLeft, plotWidth) {
+  const distanceX = toX - fromX;
+  let visibleFraction = 1;
+  if (distanceX !== 0) {
+    [...getLocalParticipations(), ...getIntervals()].forEach(({ start, end }) => {
+      const startX = xForTime(start, points, plotLeft, plotWidth);
+      const endX = xForTime(end, points, plotLeft, plotWidth);
+      if (!Number.isFinite(startX) || !Number.isFinite(endX)) return;
+      const edge = distanceX > 0
+        ? Math.min(startX, endX) - 5
+        : Math.max(startX, endX) + 5;
+      const fraction = (edge - fromX) / distanceX;
+      if (fraction > 0 && fraction < visibleFraction) visibleFraction = fraction;
+    });
+  }
+  context.beginPath();
+  context.moveTo(fromX, fromY);
+  context.lineTo(
+    fromX + distanceX * visibleFraction,
+    fromY + (toY - fromY) * visibleFraction,
+  );
+  context.stroke();
 }
 
 function wrapChartLabel(context, text, maxWidth) {
