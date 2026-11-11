@@ -599,6 +599,7 @@ function drawMultiLineChart(series, activeHeader) {
       drawSeriesLine({
         context,
         item,
+        series,
         active: item.header === activeHeader,
         padding,
         plotWidth,
@@ -642,6 +643,7 @@ function drawMultiLineChartOnContext(context, series, activeHeader, bounds, opti
       drawSeriesLine({
         context,
         item,
+        series,
         active: item.header === activeHeader,
         padding,
         plotWidth,
@@ -1259,6 +1261,7 @@ function drawAxisLabels(context, points, padding, plotWidth, height) {
 function drawSeriesLine({
   context,
   item,
+  series,
   active,
   padding,
   plotWidth,
@@ -1315,6 +1318,7 @@ function drawSeriesLine({
       minValue,
       range,
       highlightBoxes,
+      series,
     );
     if (highlightCollector) {
       movementBoxes.forEach((box) => highlightCollector.push({
@@ -1343,6 +1347,7 @@ function drawImportantMovements(
   minValue,
   range,
   occupiedBoxes = [],
+  series = [],
 ) {
   if (item.points.length < 2) return [];
 
@@ -1365,6 +1370,7 @@ function drawImportantMovements(
       minValue,
       range,
       occupiedBoxes,
+      series,
     );
     if (box) boxes.push(box);
   });
@@ -1382,6 +1388,7 @@ function drawImportantMovements(
       minValue,
       range,
       occupiedBoxes,
+      series,
     );
     if (box) boxes.push(box);
   });
@@ -1461,6 +1468,7 @@ function drawMovementLabel(
   minValue,
   range,
   occupiedBoxes,
+  series,
 ) {
   const previous = item.points[movement.startIndex ?? movement.index - 1];
   const current = item.points[movement.index];
@@ -1491,7 +1499,42 @@ function drawMovementLabel(
     { x: 0, y: preferredY - 32 },
     { x: 0, y: alternateY + 32 },
   ];
-  const candidates = candidateOffsets.flatMap((candidate) => {
+  const clearArrowBox = isBomDiaBrasil() ? findClearRetrancaBubble({
+    anchorX: currentX,
+    anchorY: currentY,
+    width: boxWidth,
+    height: boxHeight,
+    arrowBox: null,
+    occupiedBoxes,
+    series,
+    padding,
+    plotWidth,
+    plotHeight,
+    minValue,
+    range,
+    referencePoints: item.points,
+    avoidShadedBands: true,
+  }) : null;
+  if (isBomDiaBrasil() && !clearArrowBox) return;
+  const candidates = clearArrowBox ? [{
+    ...clearArrowBox,
+    bubble: retranca ? findClearRetrancaBubble({
+      anchorX: currentX,
+      anchorY: currentY,
+      width: bubbleWidth,
+      height: bubbleHeight,
+      arrowBox: clearArrowBox,
+      occupiedBoxes,
+      series,
+      padding,
+      plotWidth,
+      plotHeight,
+      minValue,
+      range,
+      referencePoints: item.points,
+      avoidShadedBands: true,
+    }) : null,
+  }] : candidateOffsets.flatMap((candidate) => {
     const x = Math.min(
       Math.max(4, initialBoxX + candidate.x),
       padding.left + plotWidth - boxWidth,
@@ -1504,9 +1547,10 @@ function drawMovementLabel(
       Math.max(4, x + (boxWidth - bubbleWidth) / 2),
       padding.left + plotWidth - bubbleWidth,
     );
+    const arrowBox = { x, y, width: boxWidth, height: boxHeight };
     const positions = retranca ? [y + boxHeight + 5, y - bubbleHeight - 5] : [0];
     return positions.map((bubbleY) => ({
-      x, y, width: boxWidth, height: boxHeight,
+      ...arrowBox,
       bubble: retranca ? { x: bubbleX, y: bubbleY, width: bubbleWidth, height: bubbleHeight } : null,
     }));
   });
@@ -1520,7 +1564,9 @@ function drawMovementLabel(
         rectanglesOverlap(candidate, occupied, 6) ||
         (candidate.bubble && rectanglesOverlap(candidate.bubble, occupied, 6)),
       ),
-  );
+  ) ?? (isBomDiaBrasil() ? candidates.find((candidate) =>
+    !occupiedBoxes.some((occupied) => rectanglesOverlap(candidate, occupied, 6)),
+  ) : null);
   if (!selectedBox) return;
   const boxX = selectedBox.x;
   const boxY = selectedBox.y;
@@ -1531,6 +1577,27 @@ function drawMovementLabel(
   )}`;
 
   context.save();
+  if (clearArrowBox) {
+    const endX = Math.min(Math.max(currentX, boxX + 8), boxX + boxWidth - 8);
+    const endY = boxY > currentY ? boxY : boxY + boxHeight;
+    context.strokeStyle = color;
+    context.lineWidth = 1;
+    context.beginPath();
+    context.moveTo(currentX, currentY);
+    context.lineTo(endX, endY);
+    context.stroke();
+  }
+  if (selectedBox.bubble && isBomDiaBrasil()) {
+    const bubble = selectedBox.bubble;
+    const endX = Math.min(Math.max(currentX, bubble.x + 8), bubble.x + bubble.width - 8);
+    const endY = bubble.y > currentY ? bubble.y : bubble.y + bubble.height;
+    context.strokeStyle = "#71b9ed";
+    context.lineWidth = 1.5;
+    context.beginPath();
+    context.moveTo(currentX, currentY);
+    context.lineTo(endX, endY);
+    context.stroke();
+  }
   context.fillStyle = "rgba(255, 255, 255, 0.96)";
   context.strokeStyle = color;
   context.lineWidth = 1.5;
@@ -1591,6 +1658,59 @@ function wrapChartLabel(context, text, maxWidth) {
   });
   if (line) lines.push(line);
   return lines;
+}
+
+function findClearRetrancaBubble({
+  anchorX, anchorY, width, height, arrowBox, occupiedBoxes, series,
+  padding, plotWidth, plotHeight, minValue, range,
+  referencePoints = [], avoidShadedBands = false,
+}) {
+  const left = padding.left;
+  const top = padding.top + 4;
+  const right = left + plotWidth;
+  const bottom = padding.top + plotHeight - 4;
+  if (height > bottom - top) return null;
+
+  const xPositions = [];
+  for (let shift = 0; shift <= plotWidth; shift += width + 16) {
+    xPositions.push(anchorX - width / 2 - shift, anchorX - width / 2 + shift);
+  }
+  const boundedXs = xPositions
+    .map((x) => Math.min(Math.max(left, x), right - width))
+    .filter((x, index, all) => all.indexOf(x) === index);
+  const shadedBands = avoidShadedBands
+    ? [...getLocalParticipations(), ...getIntervals()].map(({ start, end }) => ({
+        startX: xForTime(start, referencePoints, left, plotWidth),
+        endX: xForTime(end, referencePoints, left, plotWidth),
+      })).filter((band) => Number.isFinite(band.startX) && Number.isFinite(band.endX))
+    : [];
+  const yPositions = [];
+  for (let y = top; y <= bottom - height; y += 12) yPositions.push(y);
+  yPositions.push(bottom - height);
+  const candidates = boundedXs.flatMap((x) => yPositions.map((y) => ({ x, y, width, height })))
+    .sort((a, b) =>
+      (Math.abs(a.y + height / 2 - anchorY) + Math.abs(a.x + width / 2 - anchorX) * 0.35) -
+      (Math.abs(b.y + height / 2 - anchorY) + Math.abs(b.x + width / 2 - anchorX) * 0.35),
+    );
+  return candidates.find((bubble) =>
+    (!arrowBox || !rectanglesOverlap(bubble, arrowBox, 8)) &&
+    !shadedBands.some((band) =>
+      bubble.x < Math.max(band.startX, band.endX) + 5 &&
+      bubble.x + bubble.width > Math.min(band.startX, band.endX) - 5,
+    ) &&
+    !occupiedBoxes.some((occupied) => rectanglesOverlap(bubble, occupied, 8)) &&
+    !series.some((item) => item.points.slice(1).some((point, index) => {
+      const previous = item.points[index];
+      const x1 = xFor(index, item.points.length, left, plotWidth);
+      const x2 = xFor(index + 1, item.points.length, left, plotWidth);
+      if (x2 < bubble.x - 10 || x1 > bubble.x + width + 10) return false;
+      const y1 = yFor(previous.value, padding.top, plotHeight, minValue, range);
+      const y2 = yFor(point.value, padding.top, plotHeight, minValue, range);
+      return rectanglesOverlap(bubble, {
+        x: x1, y: Math.min(y1, y2), width: x2 - x1, height: Math.abs(y2 - y1),
+      }, 10);
+    })),
+  ) ?? null;
 }
 
 function retrancaAtAudiencePoint(pointTime, firstPointTime) {
