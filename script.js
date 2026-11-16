@@ -1480,11 +1480,12 @@ function drawMovementLabel(
   const boxWidth = 94;
   const boxHeight = 26;
   context.font = "800 11px Globotipo, Arial, sans-serif";
-  const bubbleWidth = retranca
-    ? Math.min(230, plotWidth - 8, Math.max(86, context.measureText(retranca).width + 18))
+  let bubbleWidth = retranca
+    ? Math.min(isBomDiaBrasil() ? 165 : 230, plotWidth - 8,
+      Math.max(86, context.measureText(retranca).width + 18))
     : 0;
-  const bubbleLines = retranca ? wrapChartLabel(context, retranca, bubbleWidth - 18) : [];
-  const bubbleHeight = retranca ? Math.max(24, bubbleLines.length * 15 + 10) : 0;
+  let bubbleLines = retranca ? wrapChartLabel(context, retranca, bubbleWidth - 18) : [];
+  let bubbleHeight = retranca ? Math.max(24, bubbleLines.length * 15 + 10) : 0;
   const initialBoxX = Math.min(
     Math.max(4, currentX - boxWidth / 2),
     padding.left + plotWidth - boxWidth,
@@ -1516,24 +1517,46 @@ function drawMovementLabel(
     avoidShadedBands: true,
   }) : null;
   if (isBomDiaBrasil() && !clearArrowBox) return;
+  let clearBubble = null;
+  if (isBomDiaBrasil() && retranca) {
+    // O título completo permanece no iNews e no tooltip. Na imagem, prefira
+    // abreviá-lo a afastar o balão do minuto destacado.
+    const labels = [retranca, abbreviateChartLabel(retranca, 27),
+      abbreviateChartLabel(retranca, 19)];
+    for (const label of [...new Set(labels)]) {
+      const width = Math.min(165, plotWidth - 8,
+        Math.max(86, context.measureText(label).width + 18));
+      const lines = wrapChartLabel(context, label, width - 18);
+      const height = Math.max(24, lines.length * 15 + 10);
+      const bubble = findClearRetrancaBubble({
+        anchorX: currentX,
+        anchorY: currentY,
+        width,
+        height,
+        arrowBox: clearArrowBox,
+        occupiedBoxes,
+        series,
+        padding,
+        plotWidth,
+        plotHeight,
+        minValue,
+        range,
+        referencePoints: item.points,
+        avoidShadedBands: true,
+        maxHorizontalDistance: 100,
+      });
+      if (bubble) {
+        clearBubble = bubble;
+        bubbleWidth = width;
+        bubbleHeight = height;
+        bubbleLines = lines;
+        break;
+      }
+    }
+  }
   const candidates = clearArrowBox ? [{
     ...clearArrowBox,
-    bubble: retranca ? findClearRetrancaBubble({
-      anchorX: currentX,
-      anchorY: currentY,
-      width: bubbleWidth,
-      height: bubbleHeight,
-      arrowBox: clearArrowBox,
-      occupiedBoxes,
-      series,
-      padding,
-      plotWidth,
-      plotHeight,
-      minValue,
-      range,
-      referencePoints: item.points,
-      avoidShadedBands: true,
-    }) : null,
+    bubble: clearBubble,
   }] : candidateOffsets.flatMap((candidate) => {
     const x = Math.min(
       Math.max(4, initialBoxX + candidate.x),
@@ -1628,6 +1651,7 @@ function drawMovementLabel(
     caption: movement.delta > 0 ? "Aumento de audiência relevante" : "Queda de audiência relevante",
     value: formattedDelta,
     time: current.label,
+    retranca,
   };
 }
 
@@ -1678,10 +1702,18 @@ function wrapChartLabel(context, text, maxWidth) {
   return lines;
 }
 
+function abbreviateChartLabel(text, maxLength) {
+  if (text.length <= maxLength) return text;
+  const prefix = text.slice(0, maxLength - 1).trimEnd();
+  const lastSpace = prefix.lastIndexOf(" ");
+  return `${lastSpace > 9 ? prefix.slice(0, lastSpace) : prefix}…`;
+}
+
 function findClearRetrancaBubble({
   anchorX, anchorY, width, height, arrowBox, occupiedBoxes, series,
   padding, plotWidth, plotHeight, minValue, range,
   referencePoints = [], avoidShadedBands = false,
+  maxHorizontalDistance = Infinity,
 }) {
   const left = padding.left;
   const top = padding.top + 4;
@@ -1690,7 +1722,13 @@ function findClearRetrancaBubble({
   if (height > bottom - top) return null;
 
   const xPositions = [];
-  for (let shift = 0; shift <= plotWidth; shift += width + 16) {
+  // Passos de uma largura inteira ignoravam espaços livres junto ao ponto,
+  // sobretudo entre os blocos curtos de participação local do BDBR.
+  const horizontalStep = Math.max(16, Math.min(32, width / 6));
+  const searchLimit = Number.isFinite(maxHorizontalDistance)
+    ? Math.min(plotWidth, maxHorizontalDistance + width)
+    : plotWidth;
+  for (let shift = 0; shift <= searchLimit; shift += horizontalStep) {
     xPositions.push(anchorX - width / 2 - shift, anchorX - width / 2 + shift);
   }
   const boundedXs = xPositions
@@ -1711,6 +1749,7 @@ function findClearRetrancaBubble({
       (Math.abs(b.y + height / 2 - anchorY) + Math.abs(b.x + width / 2 - anchorX) * 0.35),
     );
   return candidates.find((bubble) =>
+    Math.max(0, bubble.x - anchorX, anchorX - bubble.x - bubble.width) <= maxHorizontalDistance &&
     (!arrowBox || !rectanglesOverlap(bubble, arrowBox, 8)) &&
     !shadedBands.some((band) =>
       bubble.x < Math.max(band.startX, band.endX) + 5 &&
@@ -2529,7 +2568,7 @@ function createInteractiveHtml(imageDataUrl, interactiveData, highlights, globot
     function hide(){tooltip.style.display='none';retrancaBand.classList.remove('active');connector.classList.remove('active');globoHighlight.classList.remove('active')}
     dots.forEach(dot=>{const circle=document.createElementNS(ns,'circle');const baseRadius=dot.radius||6;circle.setAttribute('class','dot');circle.setAttribute('cx',dot.x);circle.setAttribute('cy',dot.y);circle.setAttribute('r',baseRadius);circle.setAttribute('fill',dot.color);circle.setAttribute('tabindex','0');circle.setAttribute('aria-label',dot.title+' às '+dot.time);circle.addEventListener('mouseenter',event=>{circle.setAttribute('r',baseRadius+3);show(event,dot)});circle.addEventListener('mousemove',move);circle.addEventListener('mouseleave',()=>{circle.setAttribute('r',baseRadius);hide()});circle.addEventListener('focus',event=>{circle.setAttribute('r',baseRadius+3);show(event,dot)});circle.addEventListener('blur',()=>{circle.setAttribute('r',baseRadius);hide()});svg.appendChild(circle)});
     const highlightLayer=document.querySelector('#highlightHitLayer');
-    highlights.forEach(hit=>{const rect=document.createElementNS(ns,'rect');rect.setAttribute('class','highlight-hit');rect.setAttribute('x',hit.x);rect.setAttribute('y',hit.y);rect.setAttribute('width',hit.width);rect.setAttribute('height',hit.height);rect.setAttribute('rx','8');rect.setAttribute('tabindex','0');rect.setAttribute('aria-label',hit.caption+': '+hit.value+' pontos às '+hit.time);const showDetail=event=>{title.textContent=hit.caption;details.textContent=hit.value+' pontos · '+hit.time;tooltip.style.display='block';move(event)};const hideDetail=()=>{tooltip.style.display='none'};rect.addEventListener('mouseenter',showDetail);rect.addEventListener('mousemove',move);rect.addEventListener('mouseleave',hideDetail);rect.addEventListener('focus',showDetail);rect.addEventListener('blur',hideDetail);highlightLayer.appendChild(rect)});
+    highlights.forEach(hit=>{const rect=document.createElementNS(ns,'rect');rect.setAttribute('class','highlight-hit');rect.setAttribute('x',hit.x);rect.setAttribute('y',hit.y);rect.setAttribute('width',hit.width);rect.setAttribute('height',hit.height);rect.setAttribute('rx','8');rect.setAttribute('tabindex','0');rect.setAttribute('aria-label',hit.caption+': '+hit.value+' pontos às '+hit.time+(hit.retranca?' · '+hit.retranca:''));const showDetail=event=>{title.textContent=hit.caption;details.textContent=hit.value+' pontos · '+hit.time+(hit.retranca?' · '+hit.retranca:'');tooltip.style.display='block';move(event)};const hideDetail=()=>{tooltip.style.display='none'};rect.addEventListener('mouseenter',showDetail);rect.addEventListener('mousemove',move);rect.addEventListener('mouseleave',hideDetail);rect.addEventListener('focus',showDetail);rect.addEventListener('blur',hideDetail);highlightLayer.appendChild(rect)});
   <\/script>
 </body>
 </html>`;
