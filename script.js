@@ -3386,7 +3386,8 @@ async function parseInewsPdf(file) {
     const pageRows = groupPdfItemsByRow(textContent.items);
     const retrancaHeader = pageRows.find((row) =>
       Number.isFinite(getPdfColumnX(row, "RETRANCA")) &&
-      Number.isFinite(getPdfColumnX(row, "tMat")));
+      (Number.isFinite(getPdfColumnX(row, "Rep")) ||
+        Number.isFinite(getPdfColumnX(row, "LOC"))));
     const tempoHeader = pageRows.find((row) =>
       Number.isFinite(getPdfColumnX(row, "TEMPO")) &&
       (Number.isFinite(getPdfColumnX(row, "STATUS")) ||
@@ -3396,28 +3397,37 @@ async function parseInewsPdf(file) {
     if (retrancaHeader) {
       const retrancaX = getPdfColumnX(retrancaHeader, "RETRANCA");
       const repX = getPdfColumnX(retrancaHeader, "Rep") ?? getPdfColumnX(retrancaHeader, "LOC");
-      const tMatX = getPdfColumnX(retrancaHeader, "tMat");
-      if (![retrancaX, repX, tMatX].every(Number.isFinite)) continue;
+      const samePageTMatX = getPdfColumnX(retrancaHeader, "tMat");
+      if (![retrancaX, repX].every(Number.isFinite)) continue;
       retrancaPage = pageRows
         .filter((row) => row.y < retrancaHeader.y - 2)
         .map((row) => ({
           y: row.y,
           title: getPdfCellText(row, retrancaX - 3, repX - 1),
-          duration: getPdfCellText(row, tMatX - 3, Infinity).match(/\d{1,2}:\d{2}(?::\d{2})?/)?.[0] ?? "",
+          duration: Number.isFinite(samePageTMatX)
+            ? getPdfCellText(row, samePageTMatX - 3, Infinity)
+              .match(/\d{1,2}:\d{2}(?::\d{2})?/)?.[0] ?? ""
+            : "",
         }));
     }
 
     // O PDF do iNews pode imprimir as colunas largas em páginas consecutivas:
-    // retranca/tMat na primeira e TEMPO na segunda, com as linhas na mesma altura.
+    // retranca na primeira; tMat e TEMPO na segunda, com as linhas na mesma altura.
     if (tempoHeader && retrancaPage) {
       const timeRows = pageRows.filter((row) => row.y < tempoHeader.y - 2);
+      const tMatX = getPdfColumnX(tempoHeader, "tMat");
+      const durationEndX = getPdfColumnX(tempoHeader, "STATUS") ?? tMatX + 30;
       for (const item of retrancaPage) {
         const matchingRow = timeRows.find((row) => Math.abs(row.y - item.y) <= 3);
         // Em algumas linhas o PDF une MODI, APV e TEMPO em um único item de texto.
         const time = matchingRow?.items.map((part) => part.text).join(" ")
           .match(/\d{1,2}:\d{2}:\d{2}/)?.[0];
+        const duration = item.duration || (matchingRow && Number.isFinite(tMatX)
+          ? getPdfCellText(matchingRow, tMatX - 3, durationEndX)
+            .match(/\d{1,2}:\d{2}(?::\d{2})?/)?.[0] ?? ""
+          : "");
         if (item.title && !/^\d{1,2}:\d{2}(?::\d{2})?$/.test(item.title) && time) {
-          extracted.push({ title: item.title, time, duration: item.duration });
+          extracted.push({ title: item.title, time, duration });
         }
       }
       retrancaPage = null;
